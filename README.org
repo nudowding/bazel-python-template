@@ -1,0 +1,145 @@
+* Setup
+
+Clone this repository to start a new project or copy all of the files including the '.' files into an existing project.
+
+* Dependencies
+
+Add dependencies to 'requirements.in' the run 'bazel run //:requirements.update' to generate a versioned requirements file. After updating you will need to
+add the modified 'requrements.txt' file to git.
+
+* Using Bazel
+
+- bazel run <target>
+- bazel build <target>
+- bazle test <target>
+
+* Organization
+
+** lib
+
+Put python packages in the lib subdirectory. Create a directory that
+is the name of the package and add a BUILD file to that, then create
+another subdirectory of the same name. That is where the python files
+will go. This will keep the packages organized and have one BUILD file
+per package.
+
+Example: package foo
+#+begin_example
+lib
+   /foo
+       BUILD
+       /foo
+           bar.py
+#+end_example
+
+Usage:
+#+begin_src python
+from foo import bar
+#+end_src
+
+If you need to 'import foo' add an __init__.py file to the directory
+with the python files.
+
+The BUILD file should include a single py_lib that looks like this:
+#+begin_example
+load("@rules_python//python:defs.bzl", "py_library")
+
+py_library(
+    name = "lib_py",
+    srcs = glob(["**/*.py"]),
+    imports = ["."],
+    visibility = ["//:__subpackages__"],
+)
+#+end_example
+
+This will create a target //lib/package1:lib_py. The 'imports'
+argument will allow any users of the package to import using 'import
+foo' instead of import lib.foo.foo'.
+
+If your package has any external requirements add them using using the
+'requirement' function. See example in test.
+
+** bin
+
+Put executables in the bin directory. Create a subdirectory the same
+name as the executable. There should be one executable for each
+subdirectory. Add a BUILD file and make a py_bin target that is the
+same name as the directory. This will keep the executables organized.
+
+Directory structure:
+#+begin_example
+bin/
+    hello/
+        BUILD
+        hello.py
+#+end_example
+
+BUILD file
+#+begin_example
+load("@rules_python//python:defs.bzl", "py_binary")
+
+py_binary(
+    name = "hello",
+    srcs = ["hello.py"],
+    deps = [
+	    "//lib/package1:lib_py",
+    ],
+)
+#+end_example
+
+This creates a target //bin/hello:hello which can be referred to in
+shorthand as //bin/hello or even bin/hello (if in the root of the workspace)
+
+#+begin_example
+bazel run bin/hello
+INFO: Analyzed target //bin/hello:hello (1 packages loaded, 2 targets configured).
+INFO: Found 1 target...
+Target //bin/hello:hello up-to-date:
+  bazel-bin/bin/hello/hello
+INFO: Elapsed time: 0.197s, Critical Path: 0.02s
+INFO: 1 process: 1 internal.
+INFO: Build completed successfully, 1 total action
+INFO: Running command line: bazel-bin/bin/hello/hello
+hello world!
+#+end_example
+
+
+** test
+
+Add tests to the test directory. An example test is included using the
+[[https://github.com/darrenburns/ward][Ward testing framework]] as an external dependency and package1 as a
+dependency from this WORKSPACE.
+
+#+begin_example
+load("@rules_python//python:defs.bzl", "py_test")
+load("@pip_deps//:requirements.bzl", "requirement")
+
+py_test(
+    name = "test_package1",
+    srcs = ["test_package1.py"],
+    deps = [
+        requirement("ward"),
+        "//lib/package1:lib_py",
+    ],
+)
+#+end_example
+
+Run all tests pick specific tests to run.
+#+begin_example
+bazel test //test:all
+INFO: Analyzed target //test:test_package1 (0 packages loaded, 0 targets configured).
+INFO: Found 1 test target...
+Target //test:test_package1 up-to-date:
+  bazel-bin/test/test_package1
+INFO: Elapsed time: 1.994s, Critical Path: 1.88s
+INFO: 2 processes: 2 darwin-sandbox.
+INFO: Build completed successfully, 2 total actions
+//test:test_package1                                                     PASSED in 1.1s
+
+Executed 1 out of 1 test: 1 test passes.
+There were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.
+#+end_example
+
+* Static checkers
+
+** TODO the yaml config static checker add on.
